@@ -1,50 +1,201 @@
-# Welcome to your Expo app 👋
+# Лабораторная работа №3: Приложение "Заметки" (React Native)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## Цель работы
+Научиться обрабатывать пользовательский ввод, управлять состоянием компонентов и реализовывать базовую бизнес-логику (валидацию) в мобильном приложении на React Native.
 
-## Get started
+---
 
-1. Install dependencies
+## Архитектура приложения
 
-   ```bash
-   npm install
-   ```
+### Принципы проектирования
+- **KISS** (Keep It Simple, Stupid): минимальная сложность, только необходимый функционал
+- **DRY** (Don't Repeat Yourself): вынесение повторяющейся логики в функции
+- **Clean Code**: понятные имена переменных, единый стиль, разделение ответственности
+- **YAGNI** (You Aren't Gonna Need It): не добавляем функционал "на будущее"
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+### Структура компонентов
+```
+App (Index)
+├── State Management
+│   ├── notes: Note[] — массив заметок
+│   └── inputValue: string — текст в поле ввода
+│
+├── Бизнес-логика
+│   ├── addNote() — добавление заметки с валидацией
+│   ├── deleteNote(id) — удаление с подтверждением
+│   └── toggleComplete(id) — переключение статуса выполнения
+│
+├── UI Компоненты
+│   ├── Header — заголовок + счётчик активных задач
+│   ├── InputSection — поле ввода + кнопка добавления
+│   └── NotesList — FlatList с рендером элементов
+│
+└── Типы данных
+    └── Note { id, text, completed, createdAt }
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-## Learn more
+## Реализация базового функционала
 
-To learn more about developing your project with Expo, look at the following resources:
+### 1. Управление состоянием (useState)
+```typescript
+const [notes, setNotes] = useState<Note[]>([]);
+const [inputValue, setInputValue] = useState('');
+```
+- `notes` — массив объектов заметок, хранится в памяти компонента
+- `inputValue` — контролируемое значение TextInput
+- При изменении состояния компонент автоматически перерисовывается
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### 2. Валидация ввода
+```typescript
+const addNote = () => {
+  const trimmed = inputValue.trim();
+  if (!trimmed) {
+    Alert.alert('Внимание', 'Заметка не может быть пустой');
+    return;
+  }
+  // ... создание заметки
+};
+```
+- Проверка на пустую строку после `trim()`
+- Пользователь получает обратную связь через Alert
+- Поле очищается только после успешного добавления
 
-## Join the community
+### 3. Работа со списками (FlatList)
+```typescript
+<FlatList
+  data={notes}
+  renderItem={renderNote}
+  keyExtractor={(item) => item.id}
+  ListEmptyComponent={<EmptyState />}
+/>
+```
+- `keyExtractor` — обязательный пропс для эффективного ререндера
+- `ListEmptyComponent` — UX: показываем подсказку при пустом списке
+- Виртуализация: рендерятся только видимые элементы
 
-Join our community of developers creating universal apps.
+### 4. Обработка действий пользователя
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+| Действие | Компонент | Обработчик | Результат |
+|----------|-----------|------------|-----------|
+| Ввод текста | TextInput | onChangeText | Обновление inputValue |
+| Добавить | TouchableOpacity | onPress → addNote | Новая заметка в начале списка |
+| Отметить выполненной | TouchableOpacity (всю карточку) | onPress → toggleComplete | Переключение completed + стиль |
+| Удалить | TouchableOpacity (кнопка ✕) | onPress → deleteNote | Удаление после подтверждения |
+
+### 5. Типизация (TypeScript)
+```typescript
+type Note = {
+  id: string;           // Уникальный идентификатор (timestamp)
+  text: string;         // Текст заметки
+  completed: boolean;   // Статус выполнения
+  createdAt: number;    // Время создания для сортировки
+};
+```
+- Явные типы улучшают читаемость и ловят ошибки на этапе компиляции
+- `id` как string: совместимость с ключами FlatList и будущим бэкендом
+
+---
+
+## Стилизация и UX
+
+### Визуальная иерархия
+1. **Заголовок** — крупный шрифт, жирный, контрастный цвет
+2. **Счётчик** — второстепенная информация, серый цвет
+3. **Поле ввода** — акцентная кнопка, чёткая граница фокуса
+4. **Элемент списка** — карточка с тенью, отступы, визуальный фидбек
+
+### Интерактивность
+- `activeOpacity={0.7}` — визуальный отклик на нажатие
+- `hitSlop` — увеличение области нажатия для кнопки удаления
+- `KeyboardAvoidingView` — корректное поведение с клавиатурой на iOS/Android
+
+### Состояния элементов
+```typescript
+// Выполненная заметка
+style={[styles.noteItem, item.completed && styles.noteItemCompleted]}
+textStyle={[styles.noteText, item.completed && styles.noteTextCompleted]}
+// → зачёркивание + приглушённые цвета
+```
+
+---
+
+## Запуск проекта
+
+```bash
+# Перейти в директорию проекта
+cd C:\Users\User\Documents\Mobile\Lab3
+
+# Установить зависимости (если не установлены)
+npm install
+
+# Запустить приложение
+npx expo start
+```
+
+### Тестирование функционала
+1. Введите текст в поле → нажмите "Добавить" → заметка появляется в списке
+2. Пустой ввод → появляется Alert с предупреждением
+3. Нажмите на заметку → текст зачёркивается (статус изменён)
+4. Нажмите ✕ → подтверждение → заметка удаляется
+5. Счётчик обновляется автоматически
+
+---
+
+## План улучшений (следующий этап)
+
+### 1. Группировка по датам
+```typescript
+// Структура данных
+type NoteGroup = {
+  date: string; // '2024-03-07'
+  notes: Note[];
+};
+
+// Логика группировки
+const groupNotesByDate = (notes: Note[]): NoteGroup[] => {
+  // группировка по createdAt с форматированием даты
+};
+```
+
+### 2. Визуальные улучшения
+- Анимации появления/удаления (LayoutAnimation / Reanimated)
+- Свайп-жесты для удаления (react-native-gesture-handler)
+- Темная тема (useColorScheme)
+- Иконки вместо текста (react-native-vector-icons)
+
+### 3. Расширенный функционал
+- Поиск по заметкам
+- Редактирование текста заметки
+- Сохранение в AsyncStorage (постоянное хранение)
+- Сортировка (по дате, алфавиту, статусу)
+
+---
+
+## Возможные риски и решения
+
+| Риск | Влияние | Решение |
+|------|---------|---------|
+| Потеря данных при перезагрузке | Высокое | Добавить AsyncStorage на следующем этапе |
+| Большой список → лаги | Среднее | FlatList уже использует виртуализацию; при >1000 элементов — добавить windowSize |
+| Неинтуитивное удаление | Низкое | Добавлено подтверждение через Alert |
+| Разная высота клавиатуры на Android | Низкое | KeyboardAvoidingView с platform-specific поведением |
+
+---
+
+## Соответствие заданию
+
+✅ TextInput для ввода заметки  
+✅ Кнопка "Добавить"  
+✅ FlatList со списком заметок  
+✅ Очистка поля после добавления  
+✅ Удаление элемента по кнопке (иконка ✕ справа)  
+✅ Отметка выполненной по нажатию на элемент (зачёркивание)  
+✅ Валидация: проверка на пустую строку  
+✅ Типизация TypeScript  
+✅ Чистый код без комментариев в коде (вся документация здесь)  
+
+---
+
+> **Примечание**: Код намеренно не содержит inline-комментариев, чтобы не загромождать реализацию. Все объяснения, архитектурные решения и инструкции вынесены в этот README-файл в соответствии с требованием "2-3 файла и в них всё что нужно".
