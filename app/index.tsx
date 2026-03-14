@@ -86,8 +86,11 @@ export default function Index() {
     );
   };
 
-  const renderNote = ({ item }: { item: Note }) => (
+  const renderNote = ({ item }: { item: Note }) => {
+    console.log('R');
+    return (
     <TouchableOpacity
+    
       style={[
         styles.noteItem,
         isDark && styles.noteItemDark,
@@ -129,7 +132,7 @@ export default function Index() {
         <Ionicons name="close" size={20} color="#fff" />
       </TouchableOpacity>
     </TouchableOpacity>
-  );
+  )};
 
   const theme = {
     bg: isDark ? '#1a1a2e' : '#f8fafc',
@@ -185,7 +188,6 @@ export default function Index() {
             { backgroundColor: inputValue.trim() ? theme.primary : theme.primaryDark },
           ]}
           onPress={addNote}
-          disabled={!inputValue.trim()}
           activeOpacity={0.8}
         >
           <Ionicons name="add" size={24} color="#fff" />
