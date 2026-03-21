@@ -1,5 +1,4 @@
-import React from 'react';
-import {useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   TextInput,
@@ -8,19 +7,20 @@ import {
   TouchableOpacity,
   FlatList,
   Alert,
-  KeyboardAvoidingView,
   Platform,
-  LayoutAnimation,
   UIManager,
+  LayoutAnimation,
   useColorScheme,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-
+// Включение анимаций для Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+// Типы
 type Note = {
   id: string;
   text: string;
@@ -28,17 +28,69 @@ type Note = {
   createdAt: number;
 };
 
+// Константы
+const STORAGE_KEY = '@notes_app_data';
+
 export default function Index() {
+  // Тема
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  
+
+  // Состояние
   const [notes, setNotes] = useState<Note[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Тема цветов
+  const theme = {
+    bg: isDark ? '#1a1a2e' : '#f8fafc',
+    card: isDark ? '#16213e' : '#ffffff',
+    text: isDark ? '#e2e8f0' : '#1e293b',
+    textSecondary: isDark ? '#94a3b8' : '#64748b',
+    border: isDark ? '#334155' : '#e2e8f0',
+    primary: '#3b82f6',
+    primaryDark: '#2563eb',
+    danger: '#ef4444',
+    success: '#4ade80',
+  };
+
+  // ─────────────────────────────────────────────
+  // Загрузка данных при запуске приложения
+  // ─────────────────────────────────────────────
   useEffect(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-  }, [notes]);
+    loadNotes();
+  }, []);
 
+  const loadNotes = async () => {
+    try {
+      const json = await AsyncStorage.getItem(STORAGE_KEY);
+      if (json !== null) {
+        const parsed = JSON.parse(json);
+        setNotes(parsed);
+      }
+    } catch (e) {
+      console.error('Ошибка загрузки заметок:', e);
+      Alert.alert('Ошибка', 'Не удалось загрузить данные');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────
+  // Сохранение данных после каждого изменения
+  // ─────────────────────────────────────────────
+  const saveNotes = async (notesToSave: Note[]) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(notesToSave));
+    } catch (e) {
+      console.error('Ошибка сохранения заметок:', e);
+      Alert.alert('Ошибка', 'Не удалось сохранить данные');
+    }
+  };
+
+  // ─────────────────────────────────────────────
+  // Добавление заметки
+  // ─────────────────────────────────────────────
   const addNote = () => {
     const trimmed = inputValue.trim();
     if (!trimmed) {
@@ -53,44 +105,49 @@ export default function Index() {
       createdAt: Date.now(),
     };
 
+    const updatedNotes = [newNote, ...notes];
     LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
-    setNotes([newNote, ...notes]);
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
     setInputValue('');
   };
 
+  // ─────────────────────────────────────────────
+  // Удаление заметки
+  // ─────────────────────────────────────────────
   const deleteNote = (id: string) => {
-    Alert.alert(
-      'Удаление',
-      'Удалить заметку?',
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Удалить',
-          style: 'destructive',
-          onPress: () => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.linear);
-            setNotes(notes.filter((note) => note.id !== id));
-          },
+    Alert.alert('Подтверждение', 'Удалить заметку?', [
+      { text: 'Отмена', style: 'cancel' },
+      {
+        text: 'Удалить',
+        style: 'destructive',
+        onPress: () => {
+          const updatedNotes = notes.filter((note) => note.id !== id);
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.linear);
+          setNotes(updatedNotes);
+          saveNotes(updatedNotes);
         },
-      ],
-      { cancelable: true }
-    );
+      },
+    ]);
   };
 
+  // ─────────────────────────────────────────────
+  // Переключение статуса выполнения
+  // ─────────────────────────────────────────────
   const toggleComplete = (id: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setNotes(
-      notes.map((note) =>
-        note.id === id ? { ...note, completed: !note.completed } : note
-      )
+    const updatedNotes = notes.map((note) =>
+      note.id === id ? { ...note, completed: !note.completed } : note
     );
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
   };
 
-  const renderNote = ({ item }: { item: Note }) => {
-    console.log('R');
-    return (
+  // ─────────────────────────────────────────────
+  // Рендер элемента списка
+  // ─────────────────────────────────────────────
+  const renderNote = ({ item }: { item: Note }) => (
     <TouchableOpacity
-    
       style={[
         styles.noteItem,
         isDark && styles.noteItemDark,
@@ -103,7 +160,7 @@ export default function Index() {
         <Ionicons
           name={item.completed ? 'checkbox' : 'checkbox-outline'}
           size={24}
-          color={item.completed ? '#4ade80' : (isDark ? '#888' : '#666')}
+          color={item.completed ? theme.success : (isDark ? '#888' : '#666')}
         />
       </View>
       <View style={styles.noteContent}>
@@ -132,25 +189,26 @@ export default function Index() {
         <Ionicons name="close" size={20} color="#fff" />
       </TouchableOpacity>
     </TouchableOpacity>
-  )};
+  );
 
-  const theme = {
-    bg: isDark ? '#1a1a2e' : '#f8fafc',
-    card: isDark ? '#16213e' : '#ffffff',
-    text: isDark ? '#e2e8f0' : '#1e293b',
-    textSecondary: isDark ? '#94a3b8' : '#64748b',
-    border: isDark ? '#334155' : '#e2e8f0',
-    primary: '#3b82f6',
-    primaryDark: '#2563eb',
-    danger: '#ef4444',
-    success: '#4ade80',
-  };
+  // ─────────────────────────────────────────────
+  // Загрузка (экран)
+  // ─────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: theme.bg }]}>
+        <Ionicons name="hourglass" size={48} color={theme.primary} />
+        <Text style={[styles.loadingText, { color: theme.text }]}>Загрузка...</Text>
+      </View>
+    );
+  }
 
+  // ─────────────────────────────────────────────
+  // Основной экран
+  // ─────────────────────────────────────────────
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={[styles.container, { backgroundColor: theme.bg }]}
-    >
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
+      {/* Шапка */}
       <View style={[styles.header, { backgroundColor: theme.card }]}>
         <View style={styles.headerContent}>
           <View>
@@ -165,11 +223,12 @@ export default function Index() {
         </View>
       </View>
 
+      {/* Поле ввода */}
       <View style={[styles.inputContainer, { backgroundColor: theme.card }]}>
         <TextInput
           style={[
             styles.input,
-            { 
+            {
               backgroundColor: isDark ? '#0f172a' : '#f8fafc',
               borderColor: theme.border,
               color: theme.text,
@@ -181,6 +240,8 @@ export default function Index() {
           placeholderTextColor={theme.textSecondary}
           multiline
           maxLength={200}
+          onSubmitEditing={addNote}
+          returnKeyType="done"
         />
         <TouchableOpacity
           style={[
@@ -194,6 +255,7 @@ export default function Index() {
         </TouchableOpacity>
       </View>
 
+      {/* Список */}
       <FlatList
         data={notes}
         renderItem={renderNote}
@@ -203,34 +265,36 @@ export default function Index() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <View style={[styles.emptyIcon, { backgroundColor: theme.border }]}>
-              <Ionicons 
-                name="clipboard-outline" 
-                size={32} 
-                color={theme.textSecondary} 
-              />
+              <Ionicons name="clipboard-outline" size={32} color={theme.textSecondary} />
             </View>
-            <Text style={[styles.emptyText, { color: theme.text }]}>
-              Нет заметок
-            </Text>
+            <Text style={[styles.emptyText, { color: theme.text }]}>Нет заметок</Text>
             <Text style={[styles.emptyHint, { color: theme.textSecondary }]}>
               Добавьте первую задачу выше
             </Text>
           </View>
         }
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
+// ─────────────────────────────────────────────
+// Стили
+// ─────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   headerContent: {
     flexDirection: 'row',
@@ -270,6 +334,7 @@ const styles = StyleSheet.create({
     gap: 12,
     alignItems: 'flex-end',
     borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   input: {
     flex: 1,
@@ -383,5 +448,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingHorizontal: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    marginTop: 15,
+    fontWeight: '500',
   },
 });
